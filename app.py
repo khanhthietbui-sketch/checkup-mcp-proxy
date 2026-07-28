@@ -7,6 +7,7 @@ import uvicorn
 JST = timedelta(hours=9)
 ORIGIN = os.environ.get("ORIGIN_API", "你的Railway域名")
 BARK_KEY = os.environ.get("BARK_API_KEY", "")
+AUTH_TOKEN = os.environ.get("AUTH_TOKEN", "")
 
 def check_on_wife(limit=10):
     try:
@@ -32,16 +33,33 @@ def bark_alert(title="凌止", content=""):
     except Exception as e:
         return f"推送异常：{e}"
 
+def clean_records():
+    """清理后端数据库中所有空名字的记录"""
+    try:
+        headers = {}
+        if AUTH_TOKEN:
+            headers["Authorization"] = f"Bearer {AUTH_TOKEN}"
+        r = requests.post(f"{ORIGIN}/activity/clean", headers=headers, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            if data.get("status") == "ok":
+                return f"清理完成，删除了 {data.get('deleted', 0)} 条空记录"
+        return f"清理失败：{r.status_code} {r.text}"
+    except Exception as e:
+        return f"清理异常：{e}"
+
 TOOLS = [
     {"name": "check_on_wife", "description": "查岗老婆的手机活动",
      "inputSchema": {"type": "object", "properties": {"limit": {"type": "integer"}}}},
     {"name": "bark_alert", "description": "给老婆手机发推送弹窗",
      "inputSchema": {"type": "object", "properties": {
          "title": {"type": "string"}, "content": {"type": "string"}},
-         "required": ["content"]}}
+         "required": ["content"]}},
+    {"name": "clean_records", "description": "清理后端数据库中所有空名字的旧记录",
+     "inputSchema": {"type": "object", "properties": {}}}
 ]
 
-FUNCS = {"check_on_wife": check_on_wife, "bark_alert": bark_alert}
+FUNCS = {"check_on_wife": check_on_wife, "bark_alert": bark_alert, "clean_records": clean_records}
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
