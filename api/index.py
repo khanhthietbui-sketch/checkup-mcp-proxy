@@ -7,12 +7,14 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 JST = timedelta(hours=9)
-ORIGIN = os.environ.get("ORIGIN_API", "你的Railway域名")
+# 硬编码测试
+ORIGIN = "https://web-production-661ef.up.railway.app"
 BARK_KEY = os.environ.get("BARK_API_KEY", "")
 
 def check_on_wife(limit=10):
     try:
-        r = requests.get(f"{ORIGIN}/activity/summary", timeout=10)
+        url = f"{ORIGIN}/activity/summary"
+        r = requests.get(url, timeout=10)
         data = r.json()
     except Exception as e:
         return f"查岗失败：{e}"
