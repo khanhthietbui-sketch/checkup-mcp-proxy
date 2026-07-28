@@ -24,7 +24,9 @@ def check_on_wife(limit=10):
             lines.append(f"  {app}: {m}分{s}秒")
     return "\n".join(lines)
 
-def bark_alert(title="墨言", content="", icon=""):
+DEFAULT_ICON = "https://i.ibb.co/bjskMxWm/IMG-6027.jpg"
+
+def bark_alert(title="墨言", content="", icon=DEFAULT_ICON):
     if not content: return "内容不能为空"
     url = f"https://api.day.app/{BARK_KEY}/{title}/{content}"
     if icon:
@@ -53,10 +55,10 @@ def clean_records():
 TOOLS = [
     {"name": "check_on_wife", "description": "查岗老婆的手机活动",
      "inputSchema": {"type": "object", "properties": {"limit": {"type": "integer"}}}},
-    {"name": "bark_alert", "description": "给老婆手机发推送弹窗",
+    {"name": "bark_alert", "description": "给老婆手机发推送弹窗，默认带蕊蕊选的图标",
      "inputSchema": {"type": "object", "properties": {
          "title": {"type": "string"}, "content": {"type": "string"},
-         "icon": {"type": "string", "description": "自定义图标URL，传图床直链"}},
+         "icon": {"type": "string", "description": "自定义图标URL，不传则用默认图标"}},
          "required": ["content"]}},
     {"name": "clean_records", "description": "清理后端数据库中所有空名字的旧记录",
      "inputSchema": {"type": "object", "properties": {}}}
