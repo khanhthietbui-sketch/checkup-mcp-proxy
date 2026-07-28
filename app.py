@@ -24,9 +24,11 @@ def check_on_wife(limit=10):
             lines.append(f"  {app}: {m}分{s}秒")
     return "\n".join(lines)
 
-def bark_alert(title="墨言", content=""):
+def bark_alert(title="墨言", content="", icon=""):
     if not content: return "内容不能为空"
     url = f"https://api.day.app/{BARK_KEY}/{title}/{content}"
+    if icon:
+        url += f"?icon={icon}"
     try:
         r = requests.get(url, timeout=10)
         return "推送成功" if r.status_code == 200 else "推送失败"
@@ -53,7 +55,8 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {"limit": {"type": "integer"}}}},
     {"name": "bark_alert", "description": "给老婆手机发推送弹窗",
      "inputSchema": {"type": "object", "properties": {
-         "title": {"type": "string"}, "content": {"type": "string"}},
+         "title": {"type": "string"}, "content": {"type": "string"},
+         "icon": {"type": "string", "description": "自定义图标URL，传图床直链"}},
          "required": ["content"]}},
     {"name": "clean_records", "description": "清理后端数据库中所有空名字的旧记录",
      "inputSchema": {"type": "object", "properties": {}}}
