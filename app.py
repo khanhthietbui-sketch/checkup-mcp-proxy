@@ -9,9 +9,15 @@ ORIGIN = os.environ.get("ORIGIN_API", "你的Railway域名")
 BARK_KEY = os.environ.get("BARK_API_KEY", "")
 AUTH_TOKEN = os.environ.get("AUTH_TOKEN", "")
 
+def _headers():
+    h = {}
+    if AUTH_TOKEN:
+        h["Authorization"] = f"Bearer {AUTH_TOKEN}"
+    return h
+
 def check_on_wife(limit=10):
     try:
-        r = requests.get(f"{ORIGIN}/activity/summary", timeout=10)
+        r = requests.get(f"{ORIGIN}/activity/summary", headers=_headers(), timeout=10)
         data = r.json()
     except Exception as e:
         return f"查岗失败：{e}"
@@ -27,7 +33,8 @@ def check_on_wife(limit=10):
 DEFAULT_ICON = "https://i.ibb.co/bjskMxWm/IMG-6027.jpg"
 
 def bark_alert(title="墨言", content="", icon=DEFAULT_ICON):
-    if not content: return "内容不能为空"
+    if not content:
+        return "内容不能为空"
     url = f"https://api.day.app/{BARK_KEY}/{title}/{content}"
     if icon:
         url += f"?icon={icon}"
@@ -37,38 +44,95 @@ def bark_alert(title="墨言", content="", icon=DEFAULT_ICON):
     except Exception as e:
         return f"推送异常：{e}"
 
-def clean_records():
-    """清理后端数据库中所有空名字的记录"""
+def activity_trend(days=3):
     try:
-        headers = {}
-        if AUTH_TOKEN:
-            headers["Authorization"] = f"Bearer {AUTH_TOKEN}"
-        r = requests.post(f"{ORIGIN}/activity/clean", headers=headers, timeout=10)
-        if r.status_code == 200:
-            data = r.json()
-            if data.get("status") == "ok":
-                return f"清理完成，删除了 {data.get('deleted', 0)} 条空记录"
-        return f"清理失败：{r.status_code} {r.text}"
+        r = requests.get(f"{ORIGIN}/activity/trend", params={"days": days}, headers=_headers(), timeout=10)
+        return r.text
     except Exception as e:
-        return f"清理异常：{e}"
+        return f"趋势查询失败：{e}"
+
+def idle_check(hours=2, auto_alert=True):
+    try:
+        r = requests.get(f"{ORIGIN}/activity/idle", headers=_headers(), timeout=10)
+        data = r.json()
+        idle = data.get("idle_hours")
+        if idle is None:
+            return "暂无活动记录"
+        msg = f"已空闲 {idle} 小时，最后活动于 {data.get('last_activity')}"
+        if auto_alert and idle > hours:
+            bark_alert(content=f"宝宝已经 {idle:.1f} 小时没玩手机了，查查是不是在睡觉！")
+            msg += "\n已推送超时空闲提醒"
+        return msg
+    except Exception as e:
+        return f"空闲检测失败：{e}"
+
+def daily_summary(date_str=None):
+    try:
+        params = {}
+        if date_str:
+            params["date_str"] = date_str
+        r = requests.get(f"{ORIGIN}/activity/daily", params=params, headers=_headers(), timeout=10)
+        return r.text
+    except Exception as e:
+        return f"每日总结查询失败：{e}"
+
+def get_server_status():
+    try:
+        r = requests.get(f"{ORIGIN}/status", headers=_headers(), timeout=10)
+        return r.text
+    except Exception as e:
+        return f"状态查询失败：{e}"
 
 TOOLS = [
-    {"name": "check_on_wife", "description": "查岗老婆的手机活动",
-     "inputSchema": {"type": "object", "properties": {"limit": {"type": "integer"}}}},
-    {"name": "bark_alert", "description": "给老婆手机发推送弹窗，默认带蕊蕊选的图标",
-     "inputSchema": {"type": "object", "properties": {
-         "title": {"type": "string"}, "content": {"type": "string"},
-         "icon": {"type": "string", "description": "自定义图标URL，不传则用默认图标"}},
-         "required": ["content"]}},
-    {"name": "clean_records", "description": "清理后端数据库中所有空名字的旧记录",
-     "inputSchema": {"type": "object", "properties": {}}}
+    {
+        "name": "check_on_wife",
+        "description": "查岗老婆的手机活动，返回最近打开的App和使用时长",
+        "inputSchema": {"type": "object", "properties": {"limit": {"type": "integer", "description": "返回记录数，默认10"}}}
+    },
+    {
+        "name": "bark_alert",
+        "description": "给老婆手机发Bark推送弹窗，标题固定墨言，带默认图标",
+        "inputSchema": {"type": "object", "properties": {
+            "title": {"type": "string", "description": "标题，默认墨言"},
+            "content": {"type": "string", "description": "推送正文"},
+            "icon": {"type": "string", "description": "自定义图标URL，不传则用默认"}},
+            "required": ["content"]}
+    },
+    {
+        "name": "activity_trend",
+        "description": "分析最近几天手机活动趋势，返回各时间段使用频率和常用App变化",
+        "inputSchema": {"type": "object", "properties": {"days": {"type": "integer", "description": "回溯天数，默认3"}}}
+    },
+    {
+        "name": "idle_check",
+        "description": "检测是否超过指定时间没有手机活动，超时可自动推送Bark提醒",
+        "inputSchema": {"type": "object", "properties": {
+            "hours": {"type": "number", "description": "空闲阈值小时数，默认2"},
+            "auto_alert": {"type": "boolean", "description": "超时后是否自动推送Bark提醒，默认true"}}}
+    },
+    {
+        "name": "daily_summary",
+        "description": "获取某天手机活动总结，包括常用App、使用时长分布",
+        "inputSchema": {"type": "object", "properties": {"date_str": {"type": "string", "description": "日期如 2026-07-28，可选，默认今天"}}}
+    },
+    {
+        "name": "get_server_status",
+        "description": "检测查岗后端服务运行状态，返回各模块健康情况",
+        "inputSchema": {"type": "object", "properties": {}}
+    }
 ]
 
-FUNCS = {"check_on_wife": check_on_wife, "bark_alert": bark_alert, "clean_records": clean_records}
+FUNCS = {
+    "check_on_wife": check_on_wife,
+    "bark_alert": bark_alert,
+    "activity_trend": activity_trend,
+    "idle_check": idle_check,
+    "daily_summary": daily_summary,
+    "get_server_status": get_server_status
+}
 
 app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"],
-    allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 @app.post("/mcp")
 async def mcp(req: Request):
@@ -81,8 +145,7 @@ async def mcp(req: Request):
                            "capabilities": {"tools": {}},
                            "serverInfo": {"name": "查岗MCP", "version": "1.0"}}}
     if method == "tools/list":
-        return {"jsonrpc": "2.0", "id": rid,
-                "result": {"tools": TOOLS}}
+        return {"jsonrpc": "2.0", "id": rid, "result": {"tools": TOOLS}}
     if method == "tools/call":
         name = params.get("name")
         args = params.get("arguments") or {}
@@ -94,6 +157,10 @@ async def mcp(req: Request):
                 "result": {"content": [{"type": "text", "text": str(result)}]}}
     return {"jsonrpc": "2.0", "id": rid,
             "error": {"code": -32601, "message": f"未知方法: {method}"}}
+
+@app.get("/")
+async def root():
+    return {"service": "checkup-mcp-proxy", "status": "running", "version": "1.0"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
