@@ -6,20 +6,13 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-ORIGIN = os.environ.get("ORIGIN_API", "https://web-production-3581b.up.railway.app")
+ORIGIN = "https://web-production-3581b.up.railway.app"
 BARK_KEY = os.environ.get("BARK_API_KEY", "")
-AUTH_TOKEN = os.environ.get("AUTH_TOKEN", "")
 DEFAULT_ICON = "https://i.ibb.co/bjskMxWm/IMG-6027.jpg"
-
-def _headers():
-    h = {}
-    if AUTH_TOKEN:
-        h["Authorization"] = f"Bearer {AUTH_TOKEN}"
-    return h
 
 def check_on_wife(limit=10):
     try:
-        r = requests.get(f"{ORIGIN}/activity/summary", headers=_headers(), timeout=10)
+        r = requests.get(f"{ORIGIN}/activity/summary", timeout=10)
         data = r.json()
     except Exception as e:
         return f"查岗失败：{e}"
@@ -46,14 +39,14 @@ def bark_alert(title="墨言", content="", icon=DEFAULT_ICON):
 
 def activity_trend(days=3):
     try:
-        r = requests.get(f"{ORIGIN}/activity/trend", params={"days": days}, headers=_headers(), timeout=10)
+        r = requests.get(f"{ORIGIN}/activity/trend", params={"days": days}, timeout=10)
         return r.text
     except Exception as e:
         return f"趋势查询失败：{e}"
 
 def idle_check(hours=2, auto_alert=True):
     try:
-        r = requests.get(f"{ORIGIN}/activity/idle", headers=_headers(), timeout=10)
+        r = requests.get(f"{ORIGIN}/activity/idle", timeout=10)
         data = r.json()
         idle = data.get("idle_hours")
         if idle is None:
@@ -71,14 +64,14 @@ def daily_summary(date_str=None):
         params = {}
         if date_str:
             params["date_str"] = date_str
-        r = requests.get(f"{ORIGIN}/activity/daily", params=params, headers=_headers(), timeout=10)
+        r = requests.get(f"{ORIGIN}/activity/daily", params=params, timeout=10)
         return r.text
     except Exception as e:
         return f"每日总结查询失败：{e}"
 
 def get_server_status():
     try:
-        r = requests.get(f"{ORIGIN}/status", headers=_headers(), timeout=10)
+        r = requests.get(f"{ORIGIN}/status", timeout=10)
         return r.text
     except Exception as e:
         return f"状态查询失败：{e}"
