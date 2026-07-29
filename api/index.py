@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-ORIGIN = os.environ.get("ORIGIN_API", "")
+ORIGIN = os.environ.get("ORIGIN_API", "https://web-production-3581b.up.railway.app")
 BARK_KEY = os.environ.get("BARK_API_KEY", "")
 AUTH_TOKEN = os.environ.get("AUTH_TOKEN", "")
 DEFAULT_ICON = "https://i.ibb.co/bjskMxWm/IMG-6027.jpg"
