@@ -10,6 +10,13 @@ ORIGIN = "https://web-production-3581b.up.railway.app"
 BARK_KEY = os.environ.get("BARK_API_KEY", "")
 DEFAULT_ICON = "https://i.ibb.co/bjskMxWm/IMG-6027.jpg"
 
+def _fetch_device():
+    try:
+        r = requests.get(f"{ORIGIN}/device/status", timeout=10)
+        return r.json()
+    except Exception as e:
+        return {"error": str(e)}
+
 def check_on_wife(limit=10):
     try:
         r = requests.get(f"{ORIGIN}/activity/summary", timeout=10)
@@ -23,6 +30,10 @@ def check_on_wife(limit=10):
         for app, secs in sorted(ses.items(), key=lambda x: x[1], reverse=True):
             m, s = divmod(secs, 60)
             lines.append(f"  {app}: {m}分{s}秒")
+    # 顺手附带电量和天气
+    dev = _fetch_device()
+    if dev.get("timestamp"):
+        lines.append(f"电量：{dev.get('battery') or '未知'} | 天气：{dev.get('weather') or '未知'} | 位置：{dev.get('address') or '未知'}")
     return "\n".join(lines)
 
 def bark_alert(title="墨言", content="", icon=DEFAULT_ICON):
@@ -76,10 +87,35 @@ def get_server_status():
     except Exception as e:
         return f"状态查询失败：{e}"
 
+def get_device_status():
+    dev = _fetch_device()
+    if dev.get("error"):
+        return f"设备状态查询失败：{dev['error']}"
+    if not dev.get("timestamp"):
+        return "暂无设备状态记录（快捷指令还没上报）"
+    lines = [f"电池电量：{dev.get('battery') or '未知'}"]
+    lines.append(f"设备亮度：{dev.get('brightness') or '未知'}")
+    lines.append(f"设备声音：{dev.get('volume') or '未知'}")
+    lines.append(f"设备名称：{dev.get('device_name') or '未知'}")
+    lines.append(f"上报时间：{dev.get('timestamp')}")
+    return "\n".join(lines)
+
+def get_weather():
+    dev = _fetch_device()
+    if dev.get("error"):
+        return f"天气查询失败：{dev['error']}"
+    if not dev.get("timestamp"):
+        return "暂无天气记录（快捷指令还没上报）"
+    lines = [f"当前天气：{dev.get('weather') or '未知'}"]
+    if dev.get("address"):
+        lines.append(f"所在位置：{dev['address']}")
+    lines.append(f"上报时间：{dev.get('timestamp')}")
+    return "\n".join(lines)
+
 TOOLS = [
     {
         "name": "check_on_wife",
-        "description": "查岗老婆的手机活动，返回最近打开的App和使用时长",
+        "description": "查岗老婆的手机活动，返回最近打开的App和使用时长，同时附带当前电池电量、天气和位置",
         "inputSchema": {"type": "object", "properties": {"limit": {"type": "integer", "description": "返回记录数，默认10"}}}
     },
     {
@@ -112,6 +148,16 @@ TOOLS = [
         "name": "get_server_status",
         "description": "检测查岗后端服务运行状态，返回各模块健康情况",
         "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "get_device_status",
+        "description": "查老婆手机当前设备状态：电池电量、屏幕亮度、设备音量、设备名称",
+        "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "get_weather",
+        "description": "查老婆所在位置的天气和地址",
+        "inputSchema": {"type": "object", "properties": {}}
     }
 ]
 
@@ -121,7 +167,9 @@ FUNCS = {
     "activity_trend": activity_trend,
     "idle_check": idle_check,
     "daily_summary": daily_summary,
-    "get_server_status": get_server_status
+    "get_server_status": get_server_status,
+    "get_device_status": get_device_status,
+    "get_weather": get_weather
 }
 
 app = FastAPI()
@@ -136,7 +184,7 @@ async def mcp(req: Request):
         return {"jsonrpc": "2.0", "id": rid,
                 "result": {"protocolVersion": "2024-11-05",
                            "capabilities": {"tools": {}},
-                           "serverInfo": {"name": "查岗MCP", "version": "1.2"}}}
+                           "serverInfo": {"name": "查岗MCP", "version": "1.3"}}}
     if method == "tools/list":
         return {"jsonrpc": "2.0", "id": rid, "result": {"tools": TOOLS}}
     if method == "tools/call":
@@ -153,4 +201,4 @@ async def mcp(req: Request):
 
 @app.get("/")
 async def root():
-    return {"service": "checkup-mcp-proxy", "status": "running", "version": "1.2"}
+    return {"service": "checkup-mcp-proxy", "status": "running", "version": "1.3"}
