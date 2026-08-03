@@ -36,7 +36,7 @@ def check_on_wife(limit=10):
         lines.append(f"电量：{dev.get('battery') or '未知'} | 天气：{dev.get('weather') or '未知'} | 位置：{dev.get('address') or '未知'}")
     return "\n".join(lines)
 
-def bark_alert(title="墨言", content="", icon=DEFAULT_ICON):
+def bark_alert(title="挚", content="", icon=DEFAULT_ICON):
     if not content:
         return "内容不能为空"
     url = f"https://api.day.app/{BARK_KEY}/{title}/{content}"
@@ -120,9 +120,9 @@ TOOLS = [
     },
     {
         "name": "bark_alert",
-        "description": "给老婆手机发Bark推送弹窗，标题固定墨言，带默认图标",
+        "description": "给老婆手机发Bark推送弹窗，标题固定挚，带默认图标",
         "inputSchema": {"type": "object", "properties": {
-            "title": {"type": "string", "description": "标题，默认墨言"},
+            "title": {"type": "string", "description": "标题，默认挚"},
             "content": {"type": "string", "description": "推送正文"},
             "icon": {"type": "string", "description": "自定义图标URL，不传则用默认"}},
             "required": ["content"]}
@@ -184,7 +184,7 @@ async def mcp(req: Request):
         return {"jsonrpc": "2.0", "id": rid,
                 "result": {"protocolVersion": "2024-11-05",
                            "capabilities": {"tools": {}},
-                           "serverInfo": {"name": "查岗MCP", "version": "1.3"}}}
+                           "serverInfo": {"name": "查岗MCP", "version": "1.4"}}}
     if method == "tools/list":
         return {"jsonrpc": "2.0", "id": rid, "result": {"tools": TOOLS}}
     if method == "tools/call":
@@ -201,4 +201,4 @@ async def mcp(req: Request):
 
 @app.get("/")
 async def root():
-    return {"service": "checkup-mcp-proxy", "status": "running", "version": "1.3"}
+    return {"service": "checkup-mcp-proxy", "status": "running", "version": "1.4"}
