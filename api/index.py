@@ -1,8 +1,9 @@
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import json, requests
+import json, requests, smtplib
 from datetime import datetime, timedelta
+from email.message import EmailMessage
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -30,7 +31,6 @@ def check_on_wife(limit=10):
         for app, secs in sorted(ses.items(), key=lambda x: x[1], reverse=True):
             m, s = divmod(secs, 60)
             lines.append(f"  {app}: {m}分{s}秒")
-    # 顺手附带电量和天气
     dev = _fetch_device()
     if dev.get("timestamp"):
         lines.append(f"电量：{dev.get('battery') or '未知'} | 天气：{dev.get('weather') or '未知'} | 位置：{dev.get('address') or '未知'}")
@@ -112,6 +112,32 @@ def get_weather():
     lines.append(f"上报时间：{dev.get('timestamp')}")
     return "\n".join(lines)
 
+def _send_email(subject, content=""):
+    host = os.environ.get("SMTP_HOST", "smtp.163.com")
+    port = int(os.environ.get("SMTP_PORT", "465"))
+    user = os.environ.get("SMTP_USER", "")
+    pwd = os.environ.get("SMTP_AUTH_CODE", "")
+    recip = os.environ.get("SMTP_RECIPIENT", user)
+    if not user or not pwd:
+        return "SMTP未配置：请在环境变量设置 SMTP_USER / SMTP_AUTH_CODE"
+    msg = EmailMessage()
+    msg["From"] = user
+    msg["To"] = recip
+    msg["Subject"] = subject
+    msg.set_content(content or "", charset="utf-8")
+    with smtplib.SMTP_SSL(host, port, timeout=30) as server:
+        server.login(user, pwd)
+        server.send_message(msg)
+    return f"已发送：主题={subject}"
+
+def send_iphone_cmd(cmd="测试"):
+    if cmd not in ("回来", "睡觉", "测试"):
+        return "命令必须是：回来 / 睡觉 / 测试"
+    try:
+        return _send_email(cmd, "")
+    except Exception as e:
+        return f"发送异常：{e}"
+
 TOOLS = [
     {
         "name": "check_on_wife",
@@ -158,6 +184,12 @@ TOOLS = [
         "name": "get_weather",
         "description": "查老婆所在位置的天气和地址",
         "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "send_iphone_cmd",
+        "description": "通过邮件给蕊蕊iPhone发快捷指令：cmd为回来时手机自动切回App(Kelivo)，睡觉时手机锁屏，测试只发邮件验证链路",
+        "inputSchema": {"type": "object", "properties": {
+            "cmd": {"type": "string", "description": "命令：回来 / 睡觉 / 测试"}}}
     }
 ]
 
@@ -169,7 +201,8 @@ FUNCS = {
     "daily_summary": daily_summary,
     "get_server_status": get_server_status,
     "get_device_status": get_device_status,
-    "get_weather": get_weather
+    "get_weather": get_weather,
+    "send_iphone_cmd": send_iphone_cmd
 }
 
 app = FastAPI()
@@ -184,7 +217,7 @@ async def mcp(req: Request):
         return {"jsonrpc": "2.0", "id": rid,
                 "result": {"protocolVersion": "2024-11-05",
                            "capabilities": {"tools": {}},
-                           "serverInfo": {"name": "查岗MCP", "version": "1.4"}}}
+                           "serverInfo": {"name": "查岗MCP", "version": "1.5"}}}
     if method == "tools/list":
         return {"jsonrpc": "2.0", "id": rid, "result": {"tools": TOOLS}}
     if method == "tools/call":
@@ -201,4 +234,4 @@ async def mcp(req: Request):
 
 @app.get("/")
 async def root():
-    return {"service": "checkup-mcp-proxy", "status": "running", "version": "1.4"}
+    return {"service": "checkup-mcp-proxy", "status": "running", "version": "1.5"}
